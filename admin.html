@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель сайта</title>
+    <style>
+        :root { --primary: #bb86fc; --bg: #121212; --surface: #1e1e1e; --text: #e0e0e0; --error: #cf6679; --success: #03dac6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .hidden { display: none !important; }
+        #login-screen { background-color: var(--surface); padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; }
+        #login-screen h2 { margin-top: 0; color: var(--primary); }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 8px; font-size: 0.9rem; color: #aaa; }
+        input[type="text"], input[type="password"], textarea { width: 100%; padding: 12px; box-sizing: border-box; background-color: #2c2c2c; border: 1px solid #444; border-radius: 6px; color: white; font-family: inherit; transition: border-color 0.3s; }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        button { width: 100%; padding: 12px; background-color: var(--primary); color: #000; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: opacity 0.3s; }
+        button:hover { opacity: 0.8; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        #admin-screen { width: 100%; max-width: 800px; padding: 40px 20px; margin: 40px auto; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        .form-section { background-color: var(--surface); padding: 25px; border-radius: 12px; margin-bottom: 25px; }
+        .form-section h3 { margin-top: 0; color: var(--primary); border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .image-preview { margin-top: 10px; max-width: 200px; border-radius: 8px; display: block; border: 1px solid #444; }
+        .file-input-wrapper { margin-top: 10px; padding: 15px; border: 2px dashed #444; border-radius: 6px; text-align: center; cursor: pointer; transition: border-color 0.3s; }
+        .file-input-wrapper:hover { border-color: var(--primary); }
+        .file-input-wrapper input[type="file"] { display: none; }
+        #status-message { padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: center; font-weight: bold; display: none; }
+        .status-success { background-color: rgba(3, 218, 198, 0.2); color: var(--success); border: 1px solid var(--success); }
+        .status-error { background-color: rgba(207, 102, 121, 0.2); color: var(--error); border: 1px solid var(--error); }
+        .status-loading { background-color: rgba(187, 134, 252, 0.2); color: var(--primary); border: 1px solid var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <h2>Вход в панель управления</h2>
+        <div class="input-group">
+            <label>Логин</label>
+            <input type="text" id="username" placeholder="Введите логин">
+        </div>
+        <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" id="password" placeholder="Введите пароль">
+        </div>
+        <button onclick="checkLogin()">Войти</button>
+        <p id="login-error" style="color: var(--error); margin-top: 15px; font-size: 0.9rem;"></p>
+    </div>
+
+    <div id="admin-screen" class="hidden">
+        <div class="admin-header">
+            <h2>Редактирование сайта</h2>
+            <button onclick="logout()" style="width: auto; padding: 8px 15px; background-color: #444; color: white;">Выйти</button>
+        </div>
+
+        <div id="status-message"></div>
+
+        <form id="edit-form" onsubmit="saveChanges(event)">
+            <div class="form-section">
+                <h3>Главный экран (Hero)</h3>
+                <div class="input-group">
+                    <label>Заголовок сайта</label>
+                    <input type="text" id="hero-title" required>
+                </div>
+                <div class="input-group">
+                    <label>Описание</label>
+                    <textarea id="hero-text" rows="3" required></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Главное изображение (оставьте пустым, если не хотите менять)</label>
+                    <div class="file-input-wrapper" onclick="document.getElementById('hero-image-input').click()">
+                        Нажмите, чтобы выбрать файл
+                        <input type="file" id="hero-image-input" accept="image/*" onchange="previewImage(this, 'hero-preview')">
+                    </div>
+                    <img id="hero-preview" class="image-preview hidden" src="" alt="Превью">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Блок "Особенности"</h3>
+                
+                <h4>Карточка 1</h4>
+                <div class="input-group">
+                    <label>Заголовок 1</label>
+                    <input type="text" id="card1-title" required>
+                </div>
+                <div class="input-group">
+                    <label>Текст 1</label>
+                    <textarea id="card1-text" rows="2" required></textarea>
+                </div>
+                <div class="file-input-wrapper" onclick="document.getElementById('card1-image-input').click()">
+                    Выбрать картинку для Карточки 1
+                    <input type="file" id="card1-image-input" accept="image/*" onchange="previewImage(this, 'card1-preview')">
+                </div>
+                <img id="card1-preview" class="image-preview hidden" src="" alt="Превью 1">
+                <hr style="border-color: #333; margin: 20px 0;">
+
+                <h4>Карточка 2</h4>
+                <div class="input-group">
+                    <label>Заголовок 2</label>
+                    <input type="text" id="card2-title" required>
+                </div>
+                <div class="input-group">
+                    <label>Текст 2</label>
+                    <textarea id="card2-text" rows="2" required></textarea>
+                </div>
+                <div class="file-input-wrapper" onclick="document.getElementById('card2-image-input').click()">
+                    Выбрать картинку для Карточки 2
+                    <input type="file" id="card2-image-input" accept="image/*" onchange="previewImage(this, 'card2-preview')">
+                </div>
+                <img id="card2-preview" class="image-preview hidden" src="" alt="Превью 2">
+                <hr style="border-color: #333; margin: 20px 0;">
+
+                <h4>Карточка 3</h4>
+                <div class="input-group">
+                    <label>Заголовок 3</label>
+                    <input type="text" id="card3-title" required>
+                </div>
+                <div class="input-group">
+                    <label>Текст 3</label>
+                    <textarea id="card3-text" rows="2" required></textarea>
+                </div>
+                <div class="file-input-wrapper" onclick="document.getElementById('card3-image-input').click()">
+                    Выбрать картинку для Карточки 3
+                    <input type="file" id="card3-image-input" accept="image/*" onchange="previewImage(this, 'card3-preview')">
+                </div>
+                <img id="card3-preview" class="image-preview hidden" src="" alt="Превью 3">
+            </div>
+
+            <button type="submit" id="save-btn">Сохранить изменения на сайте</button>
+        </form>
+    </div>
+
+    <script>
+        // ==========================================
+        // НАСТРОЙКИ (ВСТАВЛЕН ТВОЙ ТОКЕН)
+        // ==========================================
+        const CONFIG = {
+            ADMIN_LOGIN: "admin",
+            ADMIN_PASSWORD: "12345",
+            
+            GITHUB_TOKEN: "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",
+            GITHUB_OWNER: "sashucy-cmyk",
+            GITHUB_REPO: "my-admin-site",
+            BRANCH: "main"
+        };
+        // ==========================================
+
+        function checkLogin() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const errorEl = document.getElementById('login-error');
+
+            // Логин: admin, Пароль: 12345
+            if (user === CONFIG.ADMIN_LOGIN && pass === CONFIG.ADMIN_PASSWORD) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('admin-screen').classList.remove('hidden');
+                loadCurrentData();
+            } else {
+                errorEl.textContent = "Неверный логин или пароль!";
+            }
+        }
+
+        function logout() { location.reload(); }
+
+        function showStatus(message, type) {
+            const el = document.getElementById('status-message');
+            el.textContent = message;
+            el.className = `status-${type}`;
+            el.style.display = 'block';
+        }
+
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function getFileSha(path) {
+            const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}?ref=${CONFIG.BRANCH}`;
+            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${CONFIG.GITHUB_TOKEN}` } });
+            if (response.status === 404) return null; 
+            if (!response.ok) throw new Error('Ошибка получения SHA файла');
+            const data = await response.json();
+            return data.sha;
+        }
+
+        async function uploadToGitHub(path, contentBase64, commitMessage) {
+            const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}`;
+            const sha = await getFileSha(path);
+            const body = { message: commitMessage, content: contentBase64, branch: CONFIG.BRANCH };
+            if (sha) body.sha = sha;
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${CONFIG.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'Ошибка загрузки файла');
+            }
+            return await response.json();
+        }
+
+        async function saveChanges(event) {
+            event.preventDefault();
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            showStatus("Сохранение... Пожалуйста, подождите.", "loading");
+
+            try {
+                let heroImgUrl = "https://picsum.photos/seed/hero/800/400";
+                let card1ImgUrl = "https://picsum.photos/seed/card1/400/300";
+                let card2ImgUrl = "https://picsum.photos/seed/card2/400/300";
+                let card3ImgUrl = "https://picsum.photos/seed/card3/400/300";
+
+                const uploadImage = async (inputId, defaultUrl) => {
+                    const file = document.getElementById(inputId).files[0];
+                    if (file) {
+                        const b64 = await fileToBase64(file);
+                        const fileName = `images/img_${Date.now()}_${file.name}`;
+                        await uploadToGitHub(fileName, b64, `Загрузка изображения: ${fileName}`);
+                        return fileName; 
+                    }
+                    return defaultUrl;
+                };
+
+                heroImgUrl = await uploadImage('hero-image-input', heroImgUrl);
+                card1ImgUrl = await uploadImage('card1-image-input', card1ImgUrl);
+                card2ImgUrl = await uploadImage('card2-image-input', card2ImgUrl);
+                card3ImgUrl = await uploadImage('card3-image-input', card3ImgUrl);
+
+                const data = {
+                    heroTitle: document.getElementById('hero-title').value,
+                    heroText: document.getElementById('hero-text').value,
+                    heroImg: heroImgUrl,
+                    c1Title: document.getElementById('card1-title').value,
+                    c1Text: document.getElementById('card1-text').value,
+                    c1Img: card1ImgUrl,
+                    c2Title: document.getElementById('card2-title').value,
+                    c2Text: document.getElementById('card2-text').value,
+                    c2Img: card2ImgUrl,
+                    c3Title: document.getElementById('card3-title').value,
+                    c3Text: document.getElementById('card3-text').value,
+                    c3Img: card3ImgUrl
+                };
+
+                const newHtml = generateNewHtml(data);
+                const htmlBase64 = btoa(unescape(encodeURIComponent(newHtml)));
+                await uploadToGitHub('index.html', htmlBase64, 'Обновление контента через админку');
+
+                showStatus("✅ Успешно сохранено! Cloudflare обновит сайт через 1-2 минуты.", "success");
+                document.getElementById('edit-form').reset();
+                document.querySelectorAll('.image-preview').forEach(el => el.classList.add('hidden'));
+
+            } catch (error) {
+                console.error(error);
+                showStatus("❌ Ошибка: " + error.message, "error");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function generateNewHtml(data) {
+            return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сайт о Ничём</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
+        :root { --bg-color: #121212; --text-color: #e0e0e0; --accent-color: #bb86fc; --card-bg: #1e1e1e; }
+        body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); line-height: 1.6; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 50px; background-color: rgba(30, 30, 30, 0.8); backdrop-filter: blur(10px); position: fixed; width: 100%; top: 0; z-index: 1000; box-sizing: border-box; }
+        .logo { font-size: 1.5rem; font-weight: 700; color: var(--accent-color); text-transform: uppercase; letter-spacing: 2px; }
+        nav a { color: var(--text-color); text-decoration: none; margin-left: 20px; transition: color 0.3s; }
+        nav a:hover { color: var(--accent-color); }
+        .hero { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 20px; background: radial-gradient(circle at center, #2a2a2a 0%, var(--bg-color) 100%); }
+        .hero h1 { font-size: 4rem; margin-bottom: 20px; animation: fadeInDown 1s ease-out; }
+        .hero p { font-size: 1.2rem; max-width: 600px; margin-bottom: 40px; color: #a0a0a0; animation: fadeInUp 1s ease-out 0.5s; animation-fill-mode: both; }
+        .hero img { width: 100%; max-width: 600px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: zoomIn 1s ease-out 1s; animation-fill-mode: both; }
+        .features { padding: 100px 50px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 1200px; margin: 0 auto; }
+        .feature-card { background-color: var(--card-bg); padding: 30px; border-radius: 15px; text-align: center; transition: transform 0.3s; }
+        .feature-card:hover { transform: translateY(-10px); }
+        .feature-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 10px; margin-bottom: 20px; }
+        .feature-card h3 { color: var(--accent-color); font-size: 1.5rem; }
+        footer { text-align: center; padding: 30px; background-color: var(--card-bg); color: #888; }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">Ничто</div>
+        <nav>
+            <a href="#">Главная</a>
+            <a href="#">О проекте</a>
+            <a href="#">Контакты</a>
+        </nav>
+    </header>
+    <section class="hero">
+        <h1>${data.heroTitle}</h1>
+        <p>${data.heroText}</p>
+        <img src="${data.heroImg}" alt="Главное изображение">
+    </section>
+    <section class="features">
+        <div class="feature-card">
+            <img src="${data.c1Img}" alt="Картинка 1">
+            <h3>${data.c1Title}</h3>
+            <p>${data.c1Text}</p>
+        </div>
+        <div class="feature-card">
+            <img src="${data.c2Img}" alt="Картинка 2">
+            <h3>${data.c2Title}</h3>
+            <p>${data.c2Text}</p>
+        </div>
+        <div class="feature-card">
+            <img src="${data.c3Img}" alt="Картинка 3">
+            <h3>${data.c3Title}</h3>
+            <p>${data.c3Text}</p>
+        </div>
+    </section>
+    <footer>
+        <p>&copy; 2024 Сайт о Ничём. Все права защищены (или нет).</p>
+    </footer>
+</body>
+</html>`;
+        }
+
+        function loadCurrentData() {
+            document.getElementById('hero-title').value = "Добро пожаловать в Никуда";
+            document.getElementById('hero-text').value = "Этот сайт абсолютно ни о чем. Здесь нет скрытого смысла, сложных алгоритмов или полезной информации. Просто красивая обертка.";
+            document.getElementById('card1-title').value = "Пустота";
+            document.getElementById('card1-text').value = "Первая колонка текста. Она нужна только для того, чтобы заполнить пространство на экране.";
+            document.getElementById('card2-title').value = "Вакуум";
+            document.getElementById('card2-text').value = "Вторая колонка текста. Можно написать здесь что угодно через панель администратора.";
+            document.getElementById('card3-title').value = "Ноль";
+            document.getElementById('card3-text').value = "Третья колонка. Загружайте сюда свои картинки с устройства и меняйте этот текст.";
+        }
+    </script>
+</body>
+</html>
