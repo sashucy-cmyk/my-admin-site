@@ -133,25 +133,21 @@
 
     <script>
         // ==========================================
-        // НАСТРОЙКИ (ВСТАВЛЕН ТВОЙ ТОКЕН)
+        // НАСТРОЙКИ (ТОКЕНА ЗДЕСЬ БОЛЬШЕ НЕТ - ОН НА СЕРВЕРЕ)
         // ==========================================
         const CONFIG = {
             ADMIN_LOGIN: "admin",
             ADMIN_PASSWORD: "12345",
-            
-            GITHUB_TOKEN: "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",
             GITHUB_OWNER: "sashucy-cmyk",
             GITHUB_REPO: "my-admin-site",
             BRANCH: "main"
         };
-        // ==========================================
 
         function checkLogin() {
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
             const errorEl = document.getElementById('login-error');
 
-            // Логин: admin, Пароль: 12345
             if (user === CONFIG.ADMIN_LOGIN && pass === CONFIG.ADMIN_PASSWORD) {
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('admin-screen').classList.remove('hidden');
@@ -191,34 +187,6 @@
             });
         }
 
-        async function getFileSha(path) {
-            const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}?ref=${CONFIG.BRANCH}`;
-            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${CONFIG.GITHUB_TOKEN}` } });
-            if (response.status === 404) return null; 
-            if (!response.ok) throw new Error('Ошибка получения SHA файла');
-            const data = await response.json();
-            return data.sha;
-        }
-
-        async function uploadToGitHub(path, contentBase64, commitMessage) {
-            const url = `https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/contents/${path}`;
-            const sha = await getFileSha(path);
-            const body = { message: commitMessage, content: contentBase64, branch: CONFIG.BRANCH };
-            if (sha) body.sha = sha;
-
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${CONFIG.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message || 'Ошибка загрузки файла');
-            }
-            return await response.json();
-        }
-
         async function saveChanges(event) {
             event.preventDefault();
             const btn = document.getElementById('save-btn');
@@ -226,45 +194,64 @@
             showStatus("Сохранение... Пожалуйста, подождите.", "loading");
 
             try {
-                let heroImgUrl = "https://picsum.photos/seed/hero/800/400";
-                let card1ImgUrl = "https://picsum.photos/seed/card1/400/300";
-                let card2ImgUrl = "https://picsum.photos/seed/card2/400/300";
-                let card3ImgUrl = "https://picsum.photos/seed/card3/400/300";
-
-                const uploadImage = async (inputId, defaultUrl) => {
+                const filesToUpload = [];
+                
+                // Собираем данные для картинок
+                const processImage = async (inputId, defaultUrl) => {
                     const file = document.getElementById(inputId).files[0];
                     if (file) {
                         const b64 = await fileToBase64(file);
-                        const fileName = `images/img_${Date.now()}_${file.name}`;
-                        await uploadToGitHub(fileName, b64, `Загрузка изображения: ${fileName}`);
-                        return fileName; 
+                        // Уникальное имя, чтобы не перезаписывать старые
+                        const fileName = `images/img_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+                        filesToUpload.push({ path: fileName, content: b64 });
+                        return fileName;
                     }
                     return defaultUrl;
                 };
 
-                heroImgUrl = await uploadImage('hero-image-input', heroImgUrl);
-                card1ImgUrl = await uploadImage('card1-image-input', card1ImgUrl);
-                card2ImgUrl = await uploadImage('card2-image-input', card2ImgUrl);
-                card3ImgUrl = await uploadImage('card3-image-input', card3ImgUrl);
+                const heroImg = await processImage('hero-image-input', "https://picsum.photos/seed/hero/800/400");
+                const c1Img = await processImage('card1-image-input', "https://picsum.photos/seed/card1/400/300");
+                const c2Img = await processImage('card2-image-input', "https://picsum.photos/seed/card2/400/300");
+                const c3Img = await processImage('card3-image-input', "https://picsum.photos/seed/card3/400/300");
 
                 const data = {
                     heroTitle: document.getElementById('hero-title').value,
                     heroText: document.getElementById('hero-text').value,
-                    heroImg: heroImgUrl,
+                    heroImg: heroImg,
                     c1Title: document.getElementById('card1-title').value,
                     c1Text: document.getElementById('card1-text').value,
-                    c1Img: card1ImgUrl,
+                    c1Img: c1Img,
                     c2Title: document.getElementById('card2-title').value,
                     c2Text: document.getElementById('card2-text').value,
-                    c2Img: card2ImgUrl,
+                    c2Img: c2Img,
                     c3Title: document.getElementById('card3-title').value,
                     c3Text: document.getElementById('card3-text').value,
-                    c3Img: card3ImgUrl
+                    c3Img: c3Img
                 };
 
                 const newHtml = generateNewHtml(data);
                 const htmlBase64 = btoa(unescape(encodeURIComponent(newHtml)));
-                await uploadToGitHub('index.html', htmlBase64, 'Обновление контента через админку');
+                
+                // Добавляем сам index.html в список файлов
+                filesToUpload.push({ path: 'index.html', content: htmlBase64 });
+
+                // Отправляем на наш сервер (в файл functions/api/save.js)
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        owner: CONFIG.GITHUB_OWNER,
+                        repo: CONFIG.GITHUB_REPO,
+                        branch: CONFIG.BRANCH,
+                        files: filesToUpload,
+                        commitMessage: 'Обновление через админку'
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Ошибка сервера');
+                }
 
                 showStatus("✅ Успешно сохранено! Cloudflare обновит сайт через 1-2 минуты.", "success");
                 document.getElementById('edit-form').reset();
